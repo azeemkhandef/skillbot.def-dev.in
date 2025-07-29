@@ -2,26 +2,27 @@ FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# upgrade system packages and configure timezone data
+# Install system packages and configure timezone
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y tzdata apt-utils software-properties-common apt-transport-https build-essential && \
-    ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime && \
-    dpkg-reconfigure tzdata && \
-    # Add PHP 7.4 repository
-    add-apt-repository ppa:ondrej/php && \
-    apt-get update && \
-    # install all packages
-    apt-get install -y vim \
-        zip \
-        unzip \
-        p7zip-full \
+    apt-get install -y \
+        tzdata \
+        software-properties-common \
         curl \
-        s3cmd \
+        mysql-client \
+        git \
+        unzip \
+        zip \
+        vim \
+    && ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime \
+    && dpkg-reconfigure tzdata \
+    && add-apt-repository ppa:ondrej/php \
+    && apt-get update \
+    && apt-get install -y \
         php7.4-fpm \
+        php7.4-cli \
         php7.4-mysqli \
         php7.4-curl \
-        php7.4-cli \
         php7.4-mbstring \
         php7.4-gd \
         php7.4-zip \
@@ -31,52 +32,69 @@ RUN apt-get update && \
         php7.4-intl \
         php7.4-soap \
         php7.4-xsl \
-        poppler-utils \
+        nginx \
+        nodejs \
+        npm \
         python3-pip \
         imagemagick \
         ffmpeg \
-        net-tools \
-        nginx \
-        git \
+        poppler-utils \
         pdftk \
-        nodejs npm \
-        poppler-utils && \
-    # setup composer for php (using specific version compatible with PHP 7.4)
-    curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php && \
-    php7.4 /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --version=2.2.18 && \
-    # setup www-data's home directory
-    usermod -d /tmp/www-data www-data
+        s3cmd \
+        p7zip-full \
+    && rm -rf /var/lib/apt/lists/*
 
-# set php configuration values
-WORKDIR /var/www
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php \
+    && php7.4 /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --version=2.2.18 \
+    && rm /tmp/composer-setup.php
+
+# Set up PHP alternatives
+RUN update-alternatives --install /usr/bin/php php /usr/bin/php7.4 1
+
+# Configure PHP-FPM
 ENV PHP_INI_DIR='/etc/php/7.4/fpm'
-RUN sed -i 's/post_max_size = 8M/post_max_size = 1024M/' "${PHP_INI_DIR}/php.ini" && \
-    sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 1024M/' "${PHP_INI_DIR}/php.ini" && \
-    sed -i 's/memory_limit = 128M/memory_limit = 2048M/' "${PHP_INI_DIR}/php.ini" && \
-    sed -i 's/max_execution_time = 30/max_execution_time = 300/' "${PHP_INI_DIR}/php.ini" && \
-    sed -i 's/max_input_time = 60/max_input_time = 300/' "${PHP_INI_DIR}/php.ini" && \
-    sed -i "\|include /etc/nginx/sites-enabled/\*;|d" "/etc/nginx/nginx.conf"
+RUN sed -i 's/post_max_size = 8M/post_max_size = 1024M/' "${PHP_INI_DIR}/php.ini" \
+    && sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 1024M/' "${PHP_INI_DIR}/php.ini" \
+    && sed -i 's/memory_limit = 128M/memory_limit = 2048M/' "${PHP_INI_DIR}/php.ini" \
+    && sed -i 's/max_execution_time = 30/max_execution_time = 300/' "${PHP_INI_DIR}/php.ini" \
+    && sed -i 's/max_input_time = 60/max_input_time = 300/' "${PHP_INI_DIR}/php.ini"
 
+# Configure PHP-FPM pool
+RUN sed -i 's/listen = .*/listen = \/run\/php\/php7.4-fpm.sock/' /etc/php/7.4/fpm/pool.d/www.conf \
+    && sed -i 's/;listen.owner = .*/listen.owner = www-data/' /etc/php/7.4/fpm/pool.d/www.conf \
+    && sed -i 's/;listen.group = .*/listen.group = www-data/' /etc/php/7.4/fpm/pool.d/www.conf \
+    && sed -i 's/;listen.mode = .*/listen.mode = 0660/' /etc/php/7.4/fpm/pool.d/www.conf
+
+# Remove default nginx config
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && sed -i "\|include /etc/nginx/sites-enabled/\*;|d" "/etc/nginx/nginx.conf"
+
+# Set working directory
+WORKDIR /var/www
+
+# Copy application code
 COPY . .
 
-# Set PHP path for npm and composer commands
-ENV PATH="/usr/bin:$PATH"
-RUN update-alternatives --install /usr/bin/php php /usr/bin/php7.4 1 && \
-    npm i && \
-    composer install --no-dev --optimize-autoloader && \
-    ## phpmyadmin (using version compatible with PHP 7.4)
-    curl https://files.phpmyadmin.net/phpMyAdmin/5.1.4/phpMyAdmin-5.1.4-all-languages.tar.gz -o pma.tar.gz && \
-    mkdir /var/www/phpmyadmin && \
-    tar -xzf pma.tar.gz -C /var/www/phpmyadmin --strip-components=1 && \
-    rm pma.tar.gz
+# Install only PHP dependencies during build
+RUN if [ -f "composer.json" ]; then \
+        composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs; \
+    fi
 
-RUN mkdir -p uploads logs && \
-    chown -R www-data: uploads/ logs/ && \
-    service php7.4-fpm restart
+# Install phpMyAdmin
+RUN curl -L https://files.phpmyadmin.net/phpMyAdmin/5.1.4/phpMyAdmin-5.1.4-all-languages.tar.gz -o pma.tar.gz \
+    && mkdir -p /var/www/phpmyadmin \
+    && tar -xzf pma.tar.gz -C /var/www/phpmyadmin --strip-components=1 \
+    && rm pma.tar.gz
 
-EXPOSE 80
+# Create necessary directories and set permissions
+RUN mkdir -p uploads logs cache sessions tmp /run/php \
+    && chown -R www-data:www-data uploads/ logs/ cache/ sessions/ tmp/ phpmyadmin/ \
+    && chmod -R 755 uploads/ logs/ cache/ sessions/ tmp/
 
+# Copy and set up entrypoint script
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+EXPOSE 80
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
