@@ -1,15 +1,12 @@
 # Installing Docker Application on Ubuntu 24.04
 
-```
-bash install/server.sh
-```
-
 ## **Application Setup**
 
 ```bash
 # Clone or create your project directory
 sudo git clone https://github.com/cityowltypes/skillbot.def-dev.in.git def-skillbot
 cd def-skillbot
+bash install/server.sh
 cp sample.env .env
 ```
 
