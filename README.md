@@ -7,7 +7,7 @@ rm server.sh; curl -s https://raw.githubusercontent.com/cityowltypes/skillbot.de
 
 2. 4. Replace the \<URL\> in .env (in lines 1 and 2)
 ```
-nano .env
+cd /var/www/html/skillbot.def-dev.in; nano .env
 ```
 
 3. Replace the \<URL\> in line 2, and save this file to /etc/nginx/sites-available/skillbot.def-dev.in
@@ -72,5 +72,5 @@ sudo ln -s /etc/nginx/sites-available/skillbot.def-dev.in /etc/nginx/sites-enabl
 
 5. Replace the \<URL\> in the following command and install SSL certbot
 ```
-sudo certbot --agree-tos --no-eff-email --email azeem@defindia.org --nginx -d <URL>;
+sudo certbot --agree-tos --no-eff-email --email azeem@defindia.org --nginx -d <URL>
 ```
