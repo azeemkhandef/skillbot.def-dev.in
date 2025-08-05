@@ -1,16 +1,19 @@
 # Installing Application on Ubuntu 24.04
 
-1. Copy 
+1. Copy
+
 ```
-rm server.sh; curl -s https://raw.githubusercontent.com/cityowltypes/skillbot.def-dev.in/master/install/server.sh -o server.sh; chmod +x server.sh; bash server.sh;
+rm server.sh; curl -s https://raw.githubusercontent.com/azeemkhandef/skillbot.def-dev.in/master/install/server.sh -o server.sh; chmod +x server.sh; bash server.sh;
 ```
 
-2. 4. Replace the \<URL\> in .env (in lines 1 and 2)
+2.  4. Replace the \<URL\> in .env (in lines 1 and 2)
+
 ```
 cd /var/www/html/skillbot.def-dev.in; nano .env
 ```
 
 3. Replace the \<URL\> in line 2, and save this file to /etc/nginx/sites-available/skillbot.def-dev.in
+
 ```
 server {
     server_name <URL>;
@@ -66,11 +69,13 @@ server {
 ```
 
 4. Prepare nginx
+
 ```
 sudo ln -s /etc/nginx/sites-available/skillbot.def-dev.in /etc/nginx/sites-enabled/skillbot.def-dev.in;
 ```
 
 5. Replace the \<URL\> in the following command and install SSL certbot
+
 ```
 sudo certbot --agree-tos --no-eff-email --email azeem@defindia.org --nginx -d <URL>
 ```
